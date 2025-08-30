@@ -29,3 +29,4 @@ logs/
 
 # Jupyter
 *.ipynb_checkpoints
+venv

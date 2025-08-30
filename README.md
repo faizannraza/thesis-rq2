@@ -151,3 +151,33 @@ Follow the same steps (4–10) above.
 
 Contact
 Muhammad Faizan Raza (mfr5933@psu.edu)
+
+# sanity: be in the project root
+pwd
+ 
+# use Python 3.10 if possible (our env targets 3.10; 3.13 can be flaky with HF/PEFT)
+python --version
+ 
+# set the base model
+export MODEL="openai/gpt-oss-20b" 
+ 
+# make sure the day-1 data exists (generates all 30 days + legacy set)
+python scripts/prepare_days.py --days_dir data/days --legacy_dir data/legacy --days 30
+ 
+# train a day-01 LoRA adapter (creates models/adapters/lora_only/day_01/)
+python scripts/train_lora.py \
+  --base_model "$MODEL" \
+  --train_jsonl data/days/qa_train_day_01.jsonl \
+  --out_dir models/adapters/lora_only/day_01 \
+  --epochs 1 --bsz 1 --grad_accum 8 --lr 2e-4
+ 
+# confirm the files exist
+ls -l models/adapters/lora_only/day_01
+# you should see: adapter_config.json, adapter_model.safetensors, tokenizer files, etc.
+ 
+# now evaluate FFI on day-01
+python scripts/eval_with_adapter.py \
+  --base_model "$MODEL" \
+  --adapter_dir $(pwd)/models/adapters/lora_only/day_01 \
+  --qa_file data/days/qa_eval_day_01.jsonl \
+  --out_dir logs/ffi_day01

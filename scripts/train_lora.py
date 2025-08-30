@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import Dataset
 from transformers import (AutoTokenizer, AutoModelForCausalLM,
                           DataCollatorForLanguageModeling, Trainer, TrainingArguments)
-from peft import LoraConfig, get_peft_model, PeftModel
+from peft import LoraConfig, get_peft_model
 
 random.seed(42)
 torch.manual_seed(42)
@@ -29,7 +29,6 @@ class QADataset(Dataset):
         target = ex["answer"]
         text = prompt + " " + target
         ids = self.tok(text, truncation=True, max_length=self.max_len)
-        # Let LM learn to generate the answer (no special masking needed for simple SFT)
         return {"input_ids": ids["input_ids"], "attention_mask": ids["attention_mask"]}
 
 def train_lora(
@@ -37,13 +36,42 @@ def train_lora(
     lora_r=8, lora_alpha=16, lora_dropout=0.05,
     epochs=3, bsz=1, grad_accum=8, lr=2e-4, max_len=512
 ):
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-    dt = torch.float32  # MPS training most stable in fp32
+    # Step 1: Device + dtype
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        gpu_name = torch.cuda.get_device_name(0).lower()
+        if "h100" in gpu_name:
+            dt = torch.bfloat16
+            print("[Checkpoint] Using CUDA device (H100) with bfloat16 precision")
+        else:
+            dt = torch.float16
+            print(f"[Checkpoint] Using CUDA device ({gpu_name}) with float16 precision")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+        dt = torch.float32
+        print("[Checkpoint] Using Apple MPS backend with float32 precision")
+    else:
+        device = torch.device("cpu")
+        dt = torch.float32
+        print("[Checkpoint] Using CPU with float32 precision")
 
+    # Step 2: Tokenizer
+    print("[Checkpoint] Loading tokenizer...")
     tok = AutoTokenizer.from_pretrained(base_model, use_fast=True)
-    model = AutoModelForCausalLM.from_pretrained(base_model, torch_dtype=dt, device_map=None)
-    model.to(device)
 
+    # Step 3: Base model
+    print("[Checkpoint] Loading base model...")
+    model = AutoModelForCausalLM.from_pretrained(
+        base_model,
+        torch_dtype=dt,
+        device_map="auto" if torch.cuda.is_available() else None,
+    )
+    if torch.cuda.is_available():
+        model.gradient_checkpointing_enable()
+        print("[Checkpoint] Enabled gradient checkpointing for memory efficiency")
+
+    # Step 4: LoRA adapter
+    print("[Checkpoint] Attaching LoRA adapter...")
     peft_cfg = LoraConfig(
         r=lora_r, lora_alpha=lora_alpha, lora_dropout=lora_dropout,
         bias="none", task_type="CAUSAL_LM",
@@ -52,9 +80,13 @@ def train_lora(
     model = get_peft_model(model, peft_cfg)
     model.print_trainable_parameters()
 
+    # Step 5: Dataset
+    print(f"[Checkpoint] Loading training data from {train_jsonl}...")
     ds_train = QADataset(train_jsonl, tok, max_len=max_len)
     collator = DataCollatorForLanguageModeling(tok, mlm=False)
 
+    # Step 6: Trainer setup
+    print("[Checkpoint] Setting up Trainer...")
     args = TrainingArguments(
         output_dir=out_dir,
         per_device_train_batch_size=bsz,
@@ -63,7 +95,8 @@ def train_lora(
         num_train_epochs=epochs,
         logging_steps=25,
         save_strategy="no",
-        fp16=False, bf16=False,  # stick to fp32 on MPS
+        fp16=(dt == torch.float16),
+        bf16=(dt == torch.bfloat16),
         optim="adamw_torch",
         report_to=[],
     )
@@ -75,14 +108,19 @@ def train_lora(
         data_collator=collator,
     )
 
+    # Step 7: Training
+    print(f"[Checkpoint] Starting training for {epochs} epoch(s)...")
     start = time.time()
     trainer.train()
     dur = time.time() - start
+    print(f"[Checkpoint] Training finished in {dur:.2f} seconds")
 
-    # Save only the adapter
+    # Step 8: Save adapter
+    print(f"[Checkpoint] Saving adapter + tokenizer to {out_dir}...")
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     model.save_pretrained(out_dir)
     tok.save_pretrained(out_dir)
+
     return {"train_seconds": dur, "n_train": len(ds_train)}
 
 if __name__ == "__main__":
@@ -107,4 +145,4 @@ if __name__ == "__main__":
         lr=args.lr,
         max_len=args.max_len,
     )
-    print(stats)
+    print("[Result]", stats)
