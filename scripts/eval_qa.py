@@ -1,5 +1,5 @@
 # scripts/eval_qa.py
-import os, orjson, argparse, time, re, random
+import os, orjson, argparse, time
 from pathlib import Path
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -11,119 +11,92 @@ def load_jsonl(path):
             rows.append(orjson.loads(line))
     return rows
 
-# --- normalization helpers ---
-PUNC_EDGES = re.compile(r"^[^A-Za-z0-9]+|[^A-Za-z0-9]+$")
-ALNUM = re.compile(r"[A-Za-z0-9\-]+")
+def pick_device_dtype(args):
+    # device
+    if args.device == "cuda" and torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif args.device == "mps" and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    elif args.device in ("cpu", "auto"):
+        # auto -> prefer cuda, then mps, else cpu
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            device = torch.device("mps")
+        else:
+            device = torch.device("cpu")
+    else:
+        # fallback
+        device = torch.device("cuda" if torch.cuda.is_available() else
+                              "mps" if torch.backends.mps.is_available() else "cpu")
 
-def norm(s: str) -> str:
-    s = s.strip().lower()
-    s = PUNC_EDGES.sub("", s)
-    return s
+    # dtype
+    if device.type == "cuda":
+        if args.bf16 and torch.cuda.is_bf16_supported():
+            dtype = torch.bfloat16
+            torch.backends.cuda.matmul.allow_tf32 = True
+        elif args.fp16:
+            dtype = torch.float16
+        else:
+            dtype = torch.float32
+    else:
+        dtype = torch.float32
+    return device, dtype
 
-def first_alnum_token(s: str) -> str:
-    m = ALNUM.search(s)
-    return norm(m.group(0)) if m else norm(s)
-
-def build_inputs_answer_tag(tok, question, device):
-    # Single-turn, non-chat, with explicit answer tag
-    prompt = (
-        "Cloze task. Output ONLY the missing token (single word or 4-digit year). "
-        "No extra words, no punctuation.\n"
-        f"{question}\n"
-        "[[ANSWER]]:"
-    )
-    enc = tok(prompt, return_tensors="pt")
-    input_len = enc["input_ids"].shape[1]
-    return enc.to(device), input_len
-
-def decode_continuation(tok, full_ids, input_len):
-    gen_ids = full_ids[0, input_len:]            # continuation only
-    text = tok.decode(gen_ids, skip_special_tokens=True)
-    text = text.split("\n")[0]                   # stop at first newline
-    return text
+def greedy_answer(model, tok, question, device, max_new_tokens=32):
+    prompt = f"Question: {question}\nAnswer:"
+    ids = tok(prompt, return_tensors="pt").to(device)
+    with torch.no_grad():
+        out = model.generate(**ids, max_new_tokens=max_new_tokens, do_sample=False)
+    text = tok.decode(out[0], skip_special_tokens=True)
+    ans = text.split("Answer:")[-1].strip().split("\n")[0].strip()
+    return ans
 
 def main(args):
-    random.seed(42)
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-    dt = torch.float32
+    device, dtype = pick_device_dtype(args)
+    print(f"Loading model {args.model_name} on {device} dtype={dtype} ...")
 
-    print(f"Loading model {args.model_name} ...")
     tok = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
-    model = AutoModelForCausalLM.from_pretrained(args.model_name, torch_dtype=dt, device_map=None)
-    model.to(device).eval()
+    # eval path doesn't need 4-bit; keep it simple & fast
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model_name,
+        torch_dtype=dtype,
+        device_map="auto" if device.type == "cuda" else None
+    )
+    if device.type != "cuda":
+        model.to(device)
+    model.eval()
 
     qa = load_jsonl(args.qa_file)
-    n = min(len(qa), args.max_eval)
+    start = time.time()
     correct = 0
-    debug = []
-
-    t0 = time.time()
-    for ex in qa[:n]:
-        question = ex["question"]
-        gold_raw = ex["answer"]
-        gold = norm(gold_raw)
-
-        ids, input_len = build_inputs_answer_tag(tok, question, device)
-        out = model.generate(
-            **ids,
-            max_new_tokens=args.max_new_tokens,
-            do_sample=False,
-            temperature=None,
-            eos_token_id=tok.eos_token_id,
-        )
-
-        gen_text = decode_continuation(tok, out, input_len)
-
-        # Heuristic extractor: prefer 4-digit years or Capitalized tokens, else first alnum
-        tokens = re.findall(r"[A-Za-z0-9\-]+", gen_text)
-        cand = None
-        for t in tokens[:5]:                      # inspect first few tokens only
-            if re.fullmatch(r"\d{4}", t):
-                cand = t; break
-        if cand is None:
-            for t in tokens[:5]:
-                if re.fullmatch(r"[A-Z][a-zA-Z\-]+", t):
-                    cand = t; break
-        if cand is None and tokens:
-            cand = tokens[0]
-        pred = norm(cand or "")
-
-        hit = (pred == gold)
-        correct += 1 if hit else 0
-
-        if len(debug) < args.debug_examples:
-            debug.append({
-                "question": question,
-                "gold": gold_raw, "gold_norm": gold,
-                "gen_text": gen_text, "pred_norm": pred, "hit": hit
-            })
-
-    dur = time.time() - t0
+    for ex in qa[:args.max_eval]:
+        pred = greedy_answer(model, tok, ex["question"], device, max_new_tokens=args.max_new_tokens)
+        if pred.strip() == ex["answer"].strip():
+            correct += 1
+    dur = time.time() - start
+    n = min(len(qa), args.max_eval)
     acc = correct / max(1, n)
+
     out = {
-        "n_eval": n, "exact_match": acc,
-        "seconds": dur, "sec_per_example": dur/max(1,n),
+        "n_eval": n, "exact_match": acc, "seconds": dur,
+        "sec_per_example": (dur / max(1, n)),
         "model": args.model_name, "qa_file": args.qa_file
     }
-
     Path(args.out_dir).mkdir(parents=True, exist_ok=True)
     with open(Path(args.out_dir) / "eval.json", "wb") as f:
         f.write(orjson.dumps(out))
     print(out)
-
-    if debug:
-        with open(Path(args.out_dir) / "debug_samples.jsonl", "wb") as f:
-            for row in debug:
-                f.write(orjson.dumps(row)); f.write(b"\n")
-        print(f"Wrote {len(debug)} debug examples to {Path(args.out_dir) / 'debug_samples.jsonl'}")
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--model_name", required=True)
     ap.add_argument("--qa_file", required=True)
     ap.add_argument("--out_dir", required=True)
-    ap.add_argument("--max_eval", type=int, default=300)
-    ap.add_argument("--max_new_tokens", type=int, default=8)
-    ap.add_argument("--debug_examples", type=int, default=10)
+    ap.add_argument("--max_eval", type=int, default=1000)
+    ap.add_argument("--max_new_tokens", type=int, default=32)
+    ap.add_argument("--device", choices=["auto","cuda","mps","cpu"], default="auto")
+    ap.add_argument("--bf16", action="store_true")
+    ap.add_argument("--fp16", action="store_true")
     args = ap.parse_args()
     main(args)

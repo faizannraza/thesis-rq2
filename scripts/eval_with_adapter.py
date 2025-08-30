@@ -12,23 +12,56 @@ def load_jsonl(path):
             rows.append(orjson.loads(line))
     return rows
 
+def pick_device_dtype(args):
+    if args.device == "cuda" and torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif args.device == "mps" and torch.backends.mps.is_available():
+        device = torch.device("mps")
+    elif args.device in ("cpu", "auto"):
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            device = torch.device("mps")
+        else:
+            device = torch.device("cpu")
+    else:
+        device = torch.device("cuda" if torch.cuda.is_available() else
+                              "mps" if torch.backends.mps.is_available() else "cpu")
+
+    if device.type == "cuda":
+        if args.bf16 and torch.cuda.is_bf16_supported():
+            dtype = torch.bfloat16
+            torch.backends.cuda.matmul.allow_tf32 = True
+        elif args.fp16:
+            dtype = torch.float16
+        else:
+            dtype = torch.float32
+    else:
+        dtype = torch.float32
+    return device, dtype
+
 def greedy_answer(model, tok, question, device, max_new_tokens=32):
     prompt = f"Question: {question}\nAnswer:"
     ids = tok(prompt, return_tensors="pt").to(device)
-    out = model.generate(**ids, max_new_tokens=max_new_tokens, do_sample=False)
+    with torch.no_grad():
+        out = model.generate(**ids, max_new_tokens=max_new_tokens, do_sample=False)
     text = tok.decode(out[0], skip_special_tokens=True)
     ans = text.split("Answer:")[-1].strip().split("\n")[0].strip()
     return ans
 
 def main(args):
-    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
-    dt = torch.float32
+    device, dtype = pick_device_dtype(args)
 
     tok = AutoTokenizer.from_pretrained(args.base_model, use_fast=True)
-    base = AutoModelForCausalLM.from_pretrained(args.base_model, torch_dtype=dt, device_map=None)
-    base.to(device).eval()
+    base = AutoModelForCausalLM.from_pretrained(
+        args.base_model,
+        torch_dtype=dtype,
+        device_map="auto" if device.type == "cuda" else None
+    )
+    if device.type != "cuda":
+        base.to(device)
+    base.eval()
 
-    # load adapter
     model = PeftModel.from_pretrained(base, args.adapter_dir, is_trainable=False)
     model.to(device).eval()
 
@@ -42,8 +75,10 @@ def main(args):
     n = min(len(qa), args.max_eval)
     acc = correct / max(1, n)
 
-    out = {"n_eval": n, "exact_match": acc, "seconds": dur,
-           "base_model": args.base_model, "adapter": args.adapter_dir, "qa_file": args.qa_file}
+    out = {
+        "n_eval": n, "exact_match": acc, "seconds": dur,
+        "base_model": args.base_model, "adapter": args.adapter_dir, "qa_file": args.qa_file
+    }
     Path(args.out_dir).mkdir(parents=True, exist_ok=True)
     with open(Path(args.out_dir) / "eval.json", "wb") as f:
         f.write(orjson.dumps(out))
@@ -57,5 +92,8 @@ if __name__ == "__main__":
     ap.add_argument("--out_dir", required=True)
     ap.add_argument("--max_eval", type=int, default=1000)
     ap.add_argument("--max_new_tokens", type=int, default=32)
+    ap.add_argument("--device", choices=["auto","cuda","mps","cpu"], default="auto")
+    ap.add_argument("--bf16", action="store_true")
+    ap.add_argument("--fp16", action="store_true")
     args = ap.parse_args()
     main(args)

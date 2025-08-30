@@ -1,31 +1,20 @@
+
+# OS
+.DS_Store
+
 # Python
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-*.egg-info/
 .venv/
-.env
-.ipynb_checkpoints/
+venv/
 
-# Data & models (keep repo light)
-data/days/
-data/legacy/
-models/adapters/
-models/baseline/
-artifacts/
+# Data & artifacts (do not version)
+data/
+models/
 logs/
-
-# Allow small placeholders to remain if needed
-!data/.keep
-!models/.keep
-!artifacts/.keep
-!logs/.keep
-
-# OS / IDE
-.DS_Store
-.vscode/
-.idea/
+artifacts/
+artifacts_gpu/
+*.pkl
 
 # Jupyter
-*.ipynb_checkpoints
+.ipynb_checkpoints/
