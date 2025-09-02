@@ -100,12 +100,15 @@ zip -r full_run_smoke_deliverables_oss20b.zip deliverables artifacts/figures art
 ## 2. Expected Outputs
 
 • artifacts/rq2_*_smoke_oss20b/summary.csv → FFI, Legacy per day, train seconds, buffer size \
+
 • artifacts/figures/{ffi_over_days.png, legacy_over_days.png, final_day_summary.csv} \
+
 • logs/smoke_baseline_oss20b/eval.json \
+
 • full_run_smoke_deliverables_oss20b.zip (ready to share)
 
 ## 3. What This Repo Contains
-.
+```.
 ├── scripts/
 │   ├── prepare_days.py         # Build 30 “days” + legacy QA from Wikitext
 │   ├── eval_qa.py              # Baseline exact-match eval (no adapters)
@@ -119,9 +122,13 @@ zip -r full_run_smoke_deliverables_oss20b.zip deliverables artifacts/figures art
 ├── logs/                       # (ignored) eval logs + debug samples
 ├── requirements.txt
 └── README.md
+```
 
 ## 4. Interpreting Results
-• FFI (Freshness): should trend upward for LoRA and Hybrid
-• Legacy Accuracy: best preserved by Replay and Hybrid
-• final_day_summary.csv → captures end-state FFI/Legacy for each regimen
+• FFI (Freshness): should trend upward for LoRA and Hybrid \
+
+• Legacy Accuracy: best preserved by Replay and Hybrid \
+
+• final_day_summary.csv → captures end-state FFI/Legacy for each regimen \
+
 • The three summary.csv files (one per regimen) are the raw, per-day evidence
