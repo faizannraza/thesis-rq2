@@ -80,14 +80,17 @@ def train_lora(
             bnb_4bit_compute_dtype=torch.bfloat16 if bf16 and torch.cuda.is_bf16_supported() else torch.float16
         )
 
+    from transformers import AutoConfig
+    config = AutoConfig.from_pretrained(base_model)
+    if hasattr(config, "quantization_config") and config.quantization_config is None:
+        delattr(config, "quantization_config")
     model = AutoModelForCausalLM.from_pretrained(
         base_model,
+        config=config,
         torch_dtype=dtype,
         device_map="auto" if device.type == "cuda" else None,
         quantization_config=quant_config
     )
-    if device.type != "cuda":
-        model.to(device)
 
     if gradient_checkpointing:
         model.gradient_checkpointing_enable()

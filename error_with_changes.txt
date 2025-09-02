@@ -1,0 +1,40 @@
+(venv) ubuntu@209-20-157-106:~/continual-learning-regimen-test-exp-rq2$ python scripts/day_loop.py --base_model "$MODEL"   --regimen lora_only --max_days 3   --out_root artifacts/rq2_lora_only_smoke_oss20b   --adapters_root models/adapters   --days_dir data/days --legacy_eval data/legacy/qa_legacy_holdout.jsonl   --epochs_per_day 1 --bsz 1 --grad_accum 4 --max_len 256   --max_eval 150 --device auto >> error_with_changes.txt
+`torch_dtype` is deprecated! Use `dtype` instead!
+MXFP4 quantization requires triton >= 3.4.0 and kernels installed, we will default to dequantizing the model to bf16
+Loading checkpoint shards: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 3/3 [00:07<00:00,  2.34s/it]
+Some parameters are on the meta device because they were offloaded to the cpu.
+Traceback (most recent call last):
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/scripts/train_lora.py", line 166, in <module>
+    stats = train_lora(
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/scripts/train_lora.py", line 133, in train_lora
+    trainer = Trainer(
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/venv/lib/python3.10/site-packages/transformers/utils/deprecation.py", line 172, in wrapped_func
+    return func(*args, **kwargs)
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/venv/lib/python3.10/site-packages/transformers/trainer.py", line 620, in __init__
+    self._move_model_to_device(model, args.device)
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/venv/lib/python3.10/site-packages/transformers/trainer.py", line 913, in _move_model_to_device
+    model = model.to(device)
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1369, in to
+    return self._apply(convert)
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 928, in _apply
+    module._apply(fn)
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 928, in _apply
+    module._apply(fn)
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 928, in _apply
+    module._apply(fn)
+  [Previous line repeated 5 more times]
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 955, in _apply
+    param_applied = fn(param)
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1362, in convert
+    raise NotImplementedError(
+NotImplementedError: Cannot copy out of meta tensor; no data! Please use torch.nn.Module.to_empty() instead of torch.nn.Module.to() when moving module from meta to a different device.
+Traceback (most recent call last):
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/scripts/day_loop.py", line 195, in <module>
+    main(args)
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/scripts/day_loop.py", line 106, in main
+    run_cmd([
+  File "/home/ubuntu/continual-learning-regimen-test-exp-rq2/scripts/day_loop.py", line 35, in run_cmd
+    subprocess.run(list(map(str, cmd)), check=True)
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['python', 'scripts/train_lora.py', '--base_model', 'openai/gpt-oss-20b', '--train_jsonl', 'data/days/qa_train_day_01.jsonl', '--out_dir', 'models/adapters/lora_only/day_01', '--epochs', '1', '--bsz', '1', '--grad_accum', '4', '--lr', '0.0002', '--max_len', '256', '--device', 'auto']' returned non-zero exit status 1.

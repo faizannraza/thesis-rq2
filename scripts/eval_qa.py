@@ -46,6 +46,11 @@ def pick_device_dtype(args):
 def greedy_answer(model, tok, question, device, max_new_tokens=32):
     prompt = f"Question: {question}\nAnswer:"
     ids = tok(prompt, return_tensors="pt").to(device)
+    # Ensure only floating point tensors are converted to model's dtype
+    if hasattr(model, 'dtype'):
+        for k, v in ids.items():
+            if torch.is_floating_point(v):
+                ids[k] = v.to(model.dtype)
     with torch.no_grad():
         out = model.generate(**ids, max_new_tokens=max_new_tokens, do_sample=False)
     text = tok.decode(out[0], skip_special_tokens=True)
@@ -53,6 +58,11 @@ def greedy_answer(model, tok, question, device, max_new_tokens=32):
     return ans
 
 def main(args):
+    # flush the GPU memory before starting
+    import gc
+    gc.collect()
+    import torch
+    torch.cuda.empty_cache()
     device, dtype = pick_device_dtype(args)
     print(f"Loading model {args.model_name} on {device} dtype={dtype} ...")
 
@@ -63,8 +73,7 @@ def main(args):
         torch_dtype=dtype,
         device_map="auto" if device.type == "cuda" else None
     )
-    if device.type != "cuda":
-        model.to(device)
+    # Do not move model after loading; rely on torch_dtype and device_map in from_pretrained
     model.eval()
 
     qa = load_jsonl(args.qa_file)

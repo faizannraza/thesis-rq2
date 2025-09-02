@@ -35,6 +35,12 @@ def run_cmd(cmd):
     subprocess.run(list(map(str, cmd)), check=True)
 
 def main(args):
+    # flush the GPU memory before starting
+    import gc
+    gc.collect()
+    import torch
+    torch.cuda.empty_cache()
+
     random.seed(42)
     Path(args.out_root).mkdir(parents=True, exist_ok=True)
     log_dir = Path(args.out_root) / "logs"
