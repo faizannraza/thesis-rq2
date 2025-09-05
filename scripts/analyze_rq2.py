@@ -1,10 +1,10 @@
 # scripts/analyze_rq2.py
-# Robust analyzer for RQ2 runs: tolerates header variants and produces
-# ffi_over_days.png, legacy_over_days.png, final_day_summary.csv, all_runs_concat.csv
-
 import argparse
 from pathlib import Path
+import re
 import sys
+import json
+from typing import List, Tuple, Optional, Dict
 
 import matplotlib
 matplotlib.use("Agg")  # headless
@@ -12,8 +12,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
+REQ_COLS = ["day", "FFI", "LegacyAcc"]
+
+
 def pretty_label(dir_name: str) -> str:
     name = dir_name.lower()
+
     if "lora_only" in name:
         base = "LoRA-only"
     elif "replay_only" in name:
@@ -21,84 +25,178 @@ def pretty_label(dir_name: str) -> str:
     elif "hybrid" in name:
         base = "Hybrid"
     else:
-        base = dir_name
-    if "smoke" in name:
-        base += " (smoke)"
-    return base
+        base = dir_name  # fallback
+
+    # smoke vs full
+    suffix = " (smoke)" if "smoke" in name else " (full)"
+    return f"{base}{suffix}"
 
 
-def discover_runs(artifacts_root: Path) -> list[tuple[str, Path]]:
-    runs = []
-    # Look for artifacts/rq2_*/summary.csv
-    for p in artifacts_root.glob("rq2_*/summary.csv"):
-        label = pretty_label(p.parent.name)
-        runs.append((label, p))
-    # Also pick up deeper layouts just in case (optional, non-breaking)
-    for p in artifacts_root.rglob("summary.csv"):
-        if p.parent.name.startswith("rq2_") and (p.parent, p) not in runs:
-            runs.append((pretty_label(p.parent.name), p))
-    # De-duplicate by full path
-    seen = set()
-    uniq = []
-    for label, p in runs:
-        key = str(p.resolve())
-        if key not in seen:
-            seen.add(key)
-            uniq.append((label, p))
-    return uniq
-
-
-# ----- Normalization helpers -----
-_VARIANTS = {
-    "day": ["day", "Day"],
-    "FFI": ["FFI", "ffi", "freshness", "Freshness"],
-    "LegacyAcc": ["LegacyAcc", "Legacy", "legacy", "legacy_acc", "legacyacc"],
-    # Below are optional (not required for plotting, but we keep if present)
-    "train_seconds": ["train_seconds", "train_s", "train_secs", "train_time"],
-    "n_train": ["n_train", "n_today", "ntoday", "n_examples"],
-    "buffer_size": ["buffer_size", "buf_size", "buffer", "buf"],
-    "regimen": ["regimen"],
-}
-
-def _find(df: pd.DataFrame, candidates: list[str]) -> str | None:
-    lower = {c.lower(): c for c in df.columns}
-    for name in candidates:
-        if name.lower() in lower:
-            return lower[name.lower()]
+def parse_day_from_dir(p: Path) -> Optional[int]:
+    m = re.search(r"day_(\d+)", p.name)
+    if m:
+        return int(m.group(1))
     return None
 
-def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    # Rename any variant columns to canonical names
-    rename = {}
-    for canonical, variants in _VARIANTS.items():
-        found = _find(df, variants)
-        if found and found != canonical:
-            rename[found] = canonical
-    if rename:
-        df = df.rename(columns=rename)
 
-    # Ensure required columns exist
-    if "day" not in df.columns:
-        # Fallback: create a 1..N index if day missing (shouldn't happen in our runs)
-        df["day"] = range(1, len(df) + 1)
-    if "FFI" not in df.columns:
-        df["FFI"] = 0.0
-    if "LegacyAcc" not in df.columns:
-        df["LegacyAcc"] = 0.0
+def read_eval_json(eval_path: Path) -> Optional[float]:
+    try:
+        with open(eval_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # We only need exact_match
+        if isinstance(data, dict) and "exact_match" in data:
+            return float(data["exact_match"])
+    except Exception:
+        pass
+    return None
 
-    # Type coercion
-    df["day"] = pd.to_numeric(df["day"], errors="coerce").fillna(0).astype(int)
-    for c in ["FFI", "LegacyAcc"]:
-        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0.0).astype(float)
 
+def rebuild_summary_from_evals(run_dir: Path) -> Optional[pd.DataFrame]:
+    """Try to rebuild a summary dataframe from ffi/legacy eval.json files."""
+    ffi_root = run_dir / "ffi"
+    legacy_root = run_dir / "legacy"
+    if not ffi_root.exists() or not legacy_root.exists():
+        return None
+
+    rows: List[Dict] = []
+    # enumerate day folders from ffi and legacy; keep intersection
+    ffi_days = {parse_day_from_dir(p): p for p in ffi_root.glob("day_*") if p.is_dir()}
+    legacy_days = {parse_day_from_dir(p): p for p in legacy_root.glob("day_*") if p.is_dir()}
+    common_days = sorted(d for d in ffi_days.keys() if d in legacy_days and d is not None)
+
+    for day in common_days:
+        ffi_eval = ffi_days[day] / "eval.json"
+        legacy_eval = legacy_days[day] / "eval.json"
+        ffi = read_eval_json(ffi_eval)
+        legacy = read_eval_json(legacy_eval)
+        if ffi is None or legacy is None:
+            # skip this day if missing either metric
+            continue
+        rows.append({
+            "day": int(day),
+            "FFI": float(ffi),
+            "LegacyAcc": float(legacy),
+            # Optional columns if missing; we can add NaNs or zeros
+            "train_seconds": float("nan"),
+            "n_train": float("nan"),
+            "buffer_size": float("nan"),
+        })
+
+    if not rows:
+        return None
+
+    df = pd.DataFrame(rows).sort_values("day").reset_index(drop=True)
     return df
 
 
 def load_summary(path: Path) -> pd.DataFrame:
+    """Load a summary CSV and minimally validate."""
     df = pd.read_csv(path)
-    df = normalize_columns(df)
-    # Keep any extra known columns if present; plotting only needs day/FFI/LegacyAcc
+    # Ensure required columns exist
+    missing = [c for c in REQ_COLS if c not in df.columns]
+    if missing:
+        raise ValueError(f"{path} is missing required column(s): {missing}")
+    # types
+    df["day"] = df["day"].astype(int)
+    df["FFI"] = df["FFI"].astype(float)
+    df["LegacyAcc"] = df["LegacyAcc"].astype(float)
     return df
+
+
+def discover_run_dirs(artifacts_root: Path) -> List[Path]:
+    """
+    Discover run directories under artifacts.
+    We consider any directory that contains either:
+      - a summary.csv, OR
+      - ffi/day_*/eval.json AND legacy/day_*/eval.json
+    """
+    candidates = set()
+
+    # 1) Any folder that already has a summary.csv
+    for p in artifacts_root.rglob("summary.csv"):
+        if p.is_file():
+            candidates.add(p.parent)
+
+    # 2) Any folder with evals (ffi & legacy)
+    for p in artifacts_root.rglob("ffi"):
+        run_dir = p.parent
+        if (run_dir / "legacy").exists():
+            candidates.add(run_dir)
+
+    # Only keep things that look like rq2_* runs or adapters’ parents
+    # (Relaxed: keep them all; labeling will give context)
+    return sorted(candidates)
+
+
+def collect_runs(artifacts_root: Path) -> List[Tuple[str, Path]]:
+    """
+    Return list of (label, summary_csv_path).
+    If a run is missing a valid summary.csv, rebuild from evals into <run_dir>/summary.csv.
+    """
+    runs: List[Tuple[str, Path]] = []
+    for run_dir in discover_run_dirs(artifacts_root):
+        label = pretty_label(run_dir.name)
+        summary_csv = run_dir / "summary.csv"
+
+        if summary_csv.exists():
+            # Check schema; if bad, attempt rebuild
+            try:
+                _ = load_summary(summary_csv)
+            except Exception:
+                rebuilt = rebuild_summary_from_evals(run_dir)
+                if rebuilt is not None:
+                    rebuilt.to_csv(summary_csv, index=False)
+                else:
+                    # If we cannot rebuild, skip this run
+                    continue
+        else:
+            # Try to build from evals
+            rebuilt = rebuild_summary_from_evals(run_dir)
+            if rebuilt is not None:
+                rebuilt.to_csv(summary_csv, index=False)
+            else:
+                # nothing to do for this run
+                continue
+
+        # Final verification
+        try:
+            _ = load_summary(summary_csv)
+            runs.append((label, summary_csv))
+        except Exception:
+            # Skip if still invalid
+            continue
+
+    return runs
+
+
+def filtered_plot(df: pd.DataFrame, outdir: Path, predicate, postfix: str):
+    sub = df[df["RegimenLabel"].apply(predicate)]
+    if sub.empty:
+        return
+
+    # FFI
+    plt.figure()
+    for k, g in sub.groupby("RegimenLabel"):
+        g = g.sort_values("day")
+        plt.plot(g["day"], g["FFI"], label=k, marker="o")
+    plt.xlabel("Day")
+    plt.ylabel("FFI (Exact Match)")
+    plt.title(f"Freshness Over Days {postfix}")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(outdir / f"ffi_over_days_{postfix}.png", dpi=180, bbox_inches="tight")
+
+    # Legacy
+    plt.figure()
+    for k, g in sub.groupby("RegimenLabel"):
+        g = g.sort_values("day")
+        plt.plot(g["day"], g["LegacyAcc"], label=k, marker="o")
+    plt.xlabel("Day")
+    plt.ylabel("Legacy Accuracy (Exact Match)")
+    plt.title(f"Legacy Retention Over Days {postfix}")
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    plt.savefig(outdir / f"legacy_over_days_{postfix}.png", dpi=180, bbox_inches="tight")
 
 
 def main(args):
@@ -106,9 +204,8 @@ def main(args):
     outdir = Path(args.out_dir)
     outdir.mkdir(parents=True, exist_ok=True)
 
-    # Build run map: either explicit mapping or auto-discovery
+    run_map: List[Tuple[str, Path]] = []
     if args.paths:
-        run_map = []
         # format: "Label1=path/to/summary.csv,Label2=path2,..."
         for item in args.paths.split(","):
             if not item.strip():
@@ -116,16 +213,14 @@ def main(args):
             label, path = item.split("=", 1)
             run_map.append((label.strip(), Path(path.strip())))
     else:
-        run_map = discover_runs(artifacts_root)
+        run_map = collect_runs(artifacts_root)
 
     if not run_map:
         print(
             "No runs found.\n"
-            "Expected to find at least one summary.csv under artifacts/rq2_*/summary.csv.\n"
-            "Example smoke paths:\n"
-            "  artifacts/rq2_lora_only_smoke/summary.csv\n"
-            "  artifacts/rq2_replay_only_smoke/summary.csv\n"
-            "  artifacts/rq2_hybrid_smoke/summary.csv\n",
+            "I tried recursively under artifacts/ to find either:\n"
+            " - summary.csv files, or\n"
+            " - ffi/day_*/eval.json + legacy/day_*/eval.json folders to rebuild summaries.\n",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -138,18 +233,17 @@ def main(args):
         try:
             df = load_summary(path)
         except Exception as e:
-            print(f"[warn] failed to read {path}: {e}", file=sys.stderr)
+            print(f"[warn] skipping {path} due to: {e}", file=sys.stderr)
             continue
         df["RegimenLabel"] = label
         frames.append(df)
 
     if not frames:
-        raise SystemExit("Found run entries, but none of the summary.csv files could be loaded.")
+        raise SystemExit("Found candidate runs, but none yielded a valid summary.")
 
     df = pd.concat(frames, ignore_index=True)
 
-    # ---- Plots ----
-    # FFI over days
+    # Overall FFI over days
     plt.figure()
     for k, g in df.groupby("RegimenLabel"):
         g = g.sort_values("day")
@@ -161,7 +255,7 @@ def main(args):
     plt.grid(True, alpha=0.3)
     plt.savefig(outdir / "ffi_over_days.png", dpi=180, bbox_inches="tight")
 
-    # Legacy over days
+    # Overall Legacy over days
     plt.figure()
     for k, g in df.groupby("RegimenLabel"):
         g = g.sort_values("day")
@@ -173,10 +267,18 @@ def main(args):
     plt.grid(True, alpha=0.3)
     plt.savefig(outdir / "legacy_over_days.png", dpi=180, bbox_inches="tight")
 
-    # Final-day comparison table
+    # Optional filtered overlays (smoke-only / full-only)
+    has_smoke = any("(smoke)" in s for s in df["RegimenLabel"].unique())
+    has_full = any("(full)" in s for s in df["RegimenLabel"].unique())
+    if has_smoke:
+        filtered_plot(df, outdir, lambda s: "(smoke)" in s, "smoke_only")
+    if has_full:
+        filtered_plot(df, outdir, lambda s: "(full)" in s, "full_only")
+
+    # Final day comparison table (per label)
     last = (
         df.sort_values("day")
-          .groupby("RegimenLabel")
+          .groupby("RegimenLabel", as_index=False)
           .tail(1)[["RegimenLabel", "FFI", "LegacyAcc"]]
           .reset_index(drop=True)
     )
@@ -197,7 +299,7 @@ if __name__ == "__main__":
     ap.add_argument(
         "--paths",
         default="",
-        help='Optional explicit mapping: "LoRA-only=artifacts/rq2_lora_only_smoke/summary.csv,Replay-only=...".',
+        help='Optional explicit mapping: "LoRA-only (full)=artifacts/rq2_lora_only/summary.csv,Replay-only (smoke)=artifacts/rq2_replay_only_smoke/summary.csv".',
     )
     ap.add_argument("--out_dir", default="artifacts/figures")
     args = ap.parse_args()
