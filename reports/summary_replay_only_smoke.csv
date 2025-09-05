@@ -1,0 +1,4 @@
+day,regimen,ffi,legacy,train_seconds,n_today,buffer_size
+1,replay_only,0.02,0.02,72.6,248,255
+2,replay_only,0.055,0.06,123.9,228,482
+3,replay_only,0.025,0.02,179.9,249,725

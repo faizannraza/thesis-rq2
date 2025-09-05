@@ -1,0 +1,7 @@
+RegimenLabel,FFI,LegacyAcc
+Replay-only (smoke),0.025,0.02
+Hybrid (smoke),0.0,0.0
+LoRA-only (smoke),0.02,0.03
+LoRA-only,0.043716,0.04
+Replay-only,0.021858,0.02
+Hybrid,0.016393,0.024
