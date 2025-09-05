@@ -1,0 +1,4 @@
+day,regimen,FFI,LegacyAcc,train_seconds,n_train,buffer_size
+1,lora_only,0.0150,0.0350,75.9,248,7
+2,lora_only,0.0500,0.0150,70.7,228,7
+3,lora_only,0.0200,0.0300,75.8,249,7

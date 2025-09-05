@@ -1,0 +1,100 @@
+day,regimen,FFI,LegacyAcc,train_seconds,n_train,buffer_size,RegimenLabel
+1,hybrid,0.015,0.035,76.1,248,248,Hybrid (smoke)
+2,hybrid,0.04,0.05,125.8,228,476,Hybrid (smoke)
+3,hybrid,0.0,0.0,127.5,249,725,Hybrid (smoke)
+1,replay_only,0.013298,0.014,184.1,248,248,Replay-only
+2,replay_only,0.00813,0.016,341.5,228,476,Replay-only
+3,replay_only,0.013228,0.026,531.6,249,725,Replay-only
+4,replay_only,0.005376,0.016,753.1,245,970,Replay-only
+5,replay_only,0.0,0.002,842.4,239,1209,Replay-only
+6,replay_only,0.0,0.01,1046.6,254,1463,Replay-only
+7,replay_only,0.002597,0.002,1277.4,271,1734,Replay-only
+8,replay_only,0.0,0.004,1420.1,245,1979,Replay-only
+9,replay_only,0.0,0.004,1380.7,251,2000,Replay-only
+10,replay_only,0.0,0.002,1410.8,258,2000,Replay-only
+11,replay_only,0.005195,0.0,1387.9,259,2000,Replay-only
+12,replay_only,0.0,0.0,1401.2,255,2000,Replay-only
+13,replay_only,0.016216,0.006,1364.8,253,2000,Replay-only
+14,replay_only,0.016438,0.004,1409.9,250,2000,Replay-only
+15,replay_only,0.037234,0.02,1445.2,247,2000,Replay-only
+16,replay_only,0.008287,0.022,1424.4,238,2000,Replay-only
+17,replay_only,0.043127,0.036,1442.0,245,2000,Replay-only
+18,replay_only,0.034188,0.02,1362.7,241,2000,Replay-only
+19,replay_only,0.063014,0.042,1382.3,253,2000,Replay-only
+20,replay_only,0.002817,0.012,1497.4,252,2000,Replay-only
+21,replay_only,0.008174,0.01,1396.8,249,2000,Replay-only
+22,replay_only,0.010695,0.008,1394.3,264,2000,Replay-only
+23,replay_only,0.01108,0.006,1423.7,236,2000,Replay-only
+24,replay_only,0.011331,0.008,1387.8,232,2000,Replay-only
+25,replay_only,0.008174,0.012,1426.9,245,2000,Replay-only
+26,replay_only,0.005348,0.004,1417.1,238,2000,Replay-only
+27,replay_only,0.011142,0.008,1364.3,241,2000,Replay-only
+28,replay_only,0.015831,0.02,1373.0,263,2000,Replay-only
+29,replay_only,0.005291,0.008,1469.8,253,2000,Replay-only
+30,replay_only,0.021858,0.02,1395.9,253,2000,Replay-only
+1,lora_only,0.013298,0.014,183.9,248,248,LoRA-only
+2,lora_only,0.01355,0.018,189.7,228,476,LoRA-only
+3,lora_only,0.02381,0.018,187.5,249,725,LoRA-only
+4,lora_only,0.02957,0.036,183.3,245,970,LoRA-only
+5,lora_only,0.02381,0.03,180.5,239,1209,LoRA-only
+6,lora_only,0.002825,0.0,208.7,254,1463,LoRA-only
+7,lora_only,0.036364,0.05,202.1,271,1734,LoRA-only
+8,lora_only,0.045576,0.044,190.6,245,1979,LoRA-only
+9,lora_only,0.021918,0.014,195.3,251,2000,LoRA-only
+10,lora_only,0.00813,0.032,193.3,258,2000,LoRA-only
+11,lora_only,0.01039,0.016,207.8,259,2000,LoRA-only
+12,lora_only,0.029255,0.024,211.5,255,2000,LoRA-only
+13,lora_only,0.032432,0.058,205.0,253,2000,LoRA-only
+14,lora_only,0.035616,0.066,200.3,250,2000,LoRA-only
+15,lora_only,0.007979,0.016,182.4,247,2000,LoRA-only
+16,lora_only,0.035912,0.046,185.1,238,2000,LoRA-only
+17,lora_only,0.032345,0.046,178.5,245,2000,LoRA-only
+18,lora_only,0.022792,0.028,195.7,241,2000,LoRA-only
+19,lora_only,0.049315,0.034,182.5,253,2000,LoRA-only
+20,lora_only,0.0,0.012,191.5,252,2000,LoRA-only
+21,lora_only,0.010899,0.012,183.7,249,2000,LoRA-only
+22,lora_only,0.002674,0.01,217.9,264,2000,LoRA-only
+23,lora_only,0.074792,0.062,175.3,236,2000,LoRA-only
+24,lora_only,0.050992,0.038,177.8,232,2000,LoRA-only
+25,lora_only,0.029973,0.038,183.0,245,2000,LoRA-only
+26,lora_only,0.018717,0.03,192.0,238,2000,LoRA-only
+27,lora_only,0.013928,0.02,190.1,241,2000,LoRA-only
+28,lora_only,0.01847,0.038,194.1,263,2000,LoRA-only
+29,lora_only,0.039683,0.034,200.7,253,2000,LoRA-only
+30,lora_only,0.043716,0.04,191.7,253,2000,LoRA-only
+1,replay_only,0.02,0.02,72.6,248,255,Replay-only (smoke)
+2,replay_only,0.055,0.06,123.9,228,482,Replay-only (smoke)
+3,replay_only,0.025,0.02,179.9,249,725,Replay-only (smoke)
+1,lora_only,0.015,0.035,75.9,248,7,LoRA-only (smoke)
+2,lora_only,0.05,0.015,70.7,228,7,LoRA-only (smoke)
+3,lora_only,0.02,0.03,75.8,249,7,LoRA-only (smoke)
+1,hybrid,0.013298,0.014,185.0,248,248,Hybrid
+2,hybrid,0.00813,0.018,335.4,228,476,Hybrid
+3,hybrid,0.002646,0.002,367.9,249,725,Hybrid
+4,hybrid,0.005376,0.02,367.3,245,970,Hybrid
+5,hybrid,0.002646,0.008,385.2,239,1209,Hybrid
+6,hybrid,0.002825,0.004,371.4,254,1463,Hybrid
+7,hybrid,0.018182,0.014,402.6,271,1734,Hybrid
+8,hybrid,0.0,0.004,361.7,245,1979,Hybrid
+9,hybrid,0.013699,0.014,359.9,251,2000,Hybrid
+10,hybrid,0.00542,0.018,378.9,258,2000,Hybrid
+11,hybrid,0.012987,0.014,380.3,259,2000,Hybrid
+12,hybrid,0.00266,0.0,380.4,255,2000,Hybrid
+13,hybrid,0.016216,0.028,369.6,253,2000,Hybrid
+14,hybrid,0.010959,0.026,389.2,250,2000,Hybrid
+15,hybrid,0.005319,0.004,358.1,247,2000,Hybrid
+16,hybrid,0.013812,0.026,344.6,238,2000,Hybrid
+17,hybrid,0.032345,0.026,354.1,245,2000,Hybrid
+18,hybrid,0.0,0.01,388.1,241,2000,Hybrid
+19,hybrid,0.046575,0.028,369.8,253,2000,Hybrid
+20,hybrid,0.008451,0.01,366.2,252,2000,Hybrid
+21,hybrid,0.0,0.002,376.0,249,2000,Hybrid
+22,hybrid,0.002674,0.01,384.4,264,2000,Hybrid
+23,hybrid,0.038781,0.014,340.8,236,2000,Hybrid
+24,hybrid,0.014164,0.024,330.8,232,2000,Hybrid
+25,hybrid,0.008174,0.008,359.6,245,2000,Hybrid
+26,hybrid,0.029412,0.02,341.3,238,2000,Hybrid
+27,hybrid,0.027855,0.032,356.2,241,2000,Hybrid
+28,hybrid,0.007916,0.024,383.0,263,2000,Hybrid
+29,hybrid,0.02381,0.014,371.6,253,2000,Hybrid
+30,hybrid,0.016393,0.024,369.8,253,2000,Hybrid

@@ -1,0 +1,1 @@
+{"n_eval":376,"exact_match":0.013297872340425532,"seconds":416.7022211551666,"base_model":"TinyLlama/TinyLlama-1.1B-Chat-v1.0","adapter":"models/adapters/replay_only/day_01","qa_file":"data/days/qa_eval_day_01.jsonl"}
