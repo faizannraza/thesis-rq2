@@ -1,0 +1,4 @@
+day,regimen,ffi,legacy,train_seconds,n_today,buffer_size
+1,hybrid,0.015,0.035,76.1,248,248
+2,hybrid,0.04,0.05,125.8,228,476
+3,hybrid,0.0,0.0,127.5,249,725
