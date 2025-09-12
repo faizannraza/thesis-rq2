@@ -1,0 +1,4 @@
+day,regimen,FFI,LegacyAcc,train_seconds,n_train,buffer_size
+1,hybrid,0.0400,0.0150,107.3,256,128
+2,hybrid,0.0400,0.0250,106.5,256,128
+3,hybrid,0.0350,0.0400,106.3,256,128

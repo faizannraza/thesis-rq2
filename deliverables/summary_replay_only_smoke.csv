@@ -1,0 +1,4 @@
+day,regimen,FFI,LegacyAcc,train_seconds,n_train,buffer_size
+1,replay_only,0.0450,0.0150,59.7,128,128
+2,replay_only,0.0200,0.0250,58.9,128,128
+3,replay_only,0.0350,0.0150,58.3,128,128
