@@ -1,0 +1,20 @@
+artifacts*/
+deliverables*/
+*/__pycache__/
+*.zip
+*.png
+*.csv
+.DS_Store
+*.log
+._tmp_star_*/
+
+# large artifacts
+*.zip
+*.pt
+*.bin
+*.safetensors
+*.tar
+*.tar.gz
+*.parquet
+*.jsonl.gz
+*.jsonl.zst
