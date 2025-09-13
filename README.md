@@ -1,20 +1,48 @@
-# RQ2 — 30-Day Freshness: Continual Learning Regimens (LoRA / Replay / Hybrid)
+# RQ2 — STAR vs Baselines on CPU-Only Laptops
 
 This repo reproduces the **RQ2** experiment from the thesis:
 > _Designing Real-Time, Continual-Learning Data-Pipeline Architectures for Enterprise LLMs._
 
-We simulate **30 “days”** of new facts (from Wikitext), and compare three update regimens:
-- **LoRA-only** (cheap daily adapter)
-- **Replay-only** (memory buffer)
-- **Hybrid** (LoRA + Replay 1:1)
-
-Each day we measure:
-- **FFI (Freshness):** exact-match on day-new questions
-- **Legacy Accuracy:** exact-match on a fixed, pre-update question set
-
-Runs fine on a **Mac M1/M2** (MPS). Later we’ll containerize for AKS.
+This README is a ready-to-run guide for Faizan, Emma, and Mark to reproduce the full RQ2 experiment matrix (LoRA-only, Replay-only, Hybrid, and STAR) across three datasets and three model sizes on CPU-only laptops (macOS or Windows). No placeholders: all commands build real streams from public corpora, train/eval adapters, and produce figures + roll-up CSVs everyone pushes back to this branch.
 
 ---
+
+## Contents
+- [What we run & why](#what-we-run--why)
+- [Hardware/OS assumptions](#hardwareos-assumptions)
+- [Environment setup (everyone)](#environment-setup-everyone)
+- [Model suite (run all 3)](#model-suite-run-all-3)
+- [Dataset matrix & randomness](#dataset-matrix--randomness)
+- [Faizan's role: D1 (Wikipedia-style, 10 days)](#faizans-role-d1-wikipediastyle-10-days)
+- [Emma’s role: D2 (News-style, 10 days)](#emmas-role-d2-newsstyle-10-days)
+- [Mark’s role: D3 (StackExchange-style, 7 days)](#marks-role-d3-stackexchange-style-7-days)
+- [Aggregate plots & statistics](#aggregate-plots--statistics)
+- [What to push back](#what-to-push-back)
+- [Interpreting the results](#interpreting-the-results)
+- [Quickstart (macOS Apple Silicon)](#quickstart-macos-apple-silicon)
+---
+
+## What we run & why
+
+# Hardware/OS assumptions
+
+# Environment setup (everyone)
+
+# Model suite (run all 3)
+
+# Dataset matrix & randomness
+
+# Faizan's role: D1 (Wikipedia-style, 10 days)
+
+# Emma’s role: D2 (News-style, 10 days)
+
+# Mark’s role: D3 (StackExchange-style, 7 days)
+
+# Aggregate plots & statistics
+
+# What to push back
+
+# Interpreting the results
 
 ## Quickstart (macOS Apple Silicon)
 
